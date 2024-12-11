@@ -1,7 +1,7 @@
 # cmake_minimum_required(VERSION 3.20)
 # project(kirigami-tutorial)
 
-find_package(ECM 6.0.0 REQUIRED NO_MODULE)
+find_package(ECM 5.115 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 
 include(KDEInstallDirs)
@@ -37,6 +37,7 @@ add_executable(wivrn-dashboard
     steam_apps.cpp
     escape_string.cpp
     settings.cpp
+    rectangle_partitionner.cpp
 )
 
 set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../dbus/io.github.wivrn.Server.xml PROPERTIES INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/wivrn_qdbus_types.h")

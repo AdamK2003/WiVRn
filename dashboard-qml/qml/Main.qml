@@ -28,6 +28,8 @@ Kirigami.ApplicationWindow {
             WivrnServer.start_server();
     }
 
+    pageStack.defaultColumnWidth: 40 * Kirigami.Units.gridUnit
+
     pageStack.initialPage: Kirigami.ScrollablePage {
         ColumnLayout {
             Kirigami.InlineMessage {
@@ -72,14 +74,13 @@ Kirigami.ApplicationWindow {
             }
 
             RowLayout {
-                Layout.fillWidth: true
-
                 Image {
                     source: Qt.resolvedUrl("wivrn.svg")
                 }
 
                 ColumnLayout {
-                    Layout.preferredWidth: Number.POSITIVE_INFINITY
+                    // Layout.preferredWidth: Number.POSITIVE_INFINITY
+                    Layout.fillWidth: true
                     Controls.Label {
                         font.pixelSize: 22
                         text: root.server_started ? "Started" : "Stopped"

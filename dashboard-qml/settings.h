@@ -20,54 +20,116 @@
 
 #include <QList>
 #include <QObject>
+#include <QPointF>
+#include <QSizeF>
 #include <nlohmann/json.hpp>
 #include <qqmlintegration.h>
 
+#define SETTER_GETTER_NOTIFY(type, prop_name)    \
+private:                                         \
+	type m_##prop_name;                      \
+                                                 \
+public:                                          \
+	const type & prop_name() const           \
+	{                                        \
+		return m_##prop_name;            \
+	}                                        \
+	void set_##prop_name(const type & value) \
+	{                                        \
+		m_##prop_name = value;           \
+		prop_name##Changed(value);       \
+	}                                        \
+Q_SIGNALS:                                       \
+	void prop_name##Changed(const type &);
+
 class wivrn_server;
 
-class Encoder
+struct encoder
 {
+	enum class video_codec
+	{
+		h264,
+		h265,
+		av1,
+	};
+
+	enum class encoder_name
+	{
+		nvenc,
+		vaapi,
+		x264,
+		vulkan
+	};
+
+	std::optional<encoder_name> name;
+	double width;
+	double height;
+	double offset_x;
+	double offset_y;
+	std::optional<int> group;
+	std::optional<video_codec> codec;
+	std::map<std::string, std::string> options;
+	std::optional<std::string> device;
+
+	double top() const
+	{
+		return offset_y;
+	}
+	void set_top(double value)
+	{
+		height = bottom() - value;
+		offset_y = value;
+	}
+
+	double bottom() const
+	{
+		return offset_y + height;
+	}
+	void set_bottom(double value)
+	{
+		height = value - top();
+	}
+
+	double left() const
+	{
+		return offset_x;
+	}
+	void set_left(double value)
+	{
+		width = right() - value;
+		offset_x = value;
+	}
+
+	double right() const
+	{
+		return offset_x + width;
+	}
+	void set_right(double value)
+	{
+		width = value - left();
+	}
 };
 
 class Settings : public QObject
 {
 	Q_OBJECT
-	QML_NAMED_ELEMENT(Settings2)
+	QML_ELEMENT
 
-	nlohmann::json json_doc;
-
-	Q_PROPERTY(QList<Encoder> encoders READ encoders WRITE set_encoders NOTIFY encodersChanged)
-	Q_PROPERTY(Encoder encoderPassthrough READ encoderPassthrough WRITE set_encoderPassthrough NOTIFY encoderPassthroughChanged)
+	Q_PROPERTY(bool manualEncoders READ manualEncoders WRITE set_manualEncoders NOTIFY manualEncodersChanged)
+	Q_PROPERTY(std::vector<encoder> encoders READ encoders WRITE set_encoders NOTIFY encodersChanged)
+	Q_PROPERTY(encoder encoderPassthrough READ encoderPassthrough WRITE set_encoderPassthrough NOTIFY encoderPassthroughChanged)
 	Q_PROPERTY(int bitrate READ bitrate WRITE set_bitrate NOTIFY bitrateChanged)
 	Q_PROPERTY(float scale READ scale WRITE set_scale NOTIFY scaleChanged)
 	Q_PROPERTY(QString application READ application WRITE set_application NOTIFY applicationChanged)
 	Q_PROPERTY(bool tcpOnly READ tcpOnly WRITE set_tcpOnly NOTIFY tcpOnlyChanged)
 
-#define SETTER_GETTER(type, prop_name)     \
-private:                                   \
-	type m_##prop_name;                \
-                                           \
-public:                                    \
-	type prop_name() const             \
-	{                                  \
-		return m_##prop_name;      \
-	}                                  \
-	void set_##prop_name(type value)   \
-	{                                  \
-		m_##prop_name = value;     \
-		prop_name##Changed(value); \
-	}                                  \
-Q_SIGNALS:                                 \
-	void prop_name##Changed(type);
-
-	SETTER_GETTER(QList<Encoder>, encoders)
-	SETTER_GETTER(Encoder, encoderPassthrough)
-	SETTER_GETTER(int, bitrate)
-	SETTER_GETTER(float, scale)
-	SETTER_GETTER(QString, application)
-	SETTER_GETTER(bool, tcpOnly)
-
-#undef SETTER_GETTER
+	SETTER_GETTER_NOTIFY(bool, manualEncoders)
+	SETTER_GETTER_NOTIFY(std::vector<encoder>, encoders)
+	SETTER_GETTER_NOTIFY(encoder, encoderPassthrough)
+	SETTER_GETTER_NOTIFY(int, bitrate)
+	SETTER_GETTER_NOTIFY(float, scale)
+	SETTER_GETTER_NOTIFY(QString, application)
+	SETTER_GETTER_NOTIFY(bool, tcpOnly)
 
 public:
 	Settings(QObject * parent = nullptr) :
@@ -76,4 +138,11 @@ public:
 	Q_INVOKABLE void load(const wivrn_server * server);
 	Q_INVOKABLE void save(wivrn_server * server);
 	Q_INVOKABLE void restore_defaults();
+
+	static std::optional<encoder::encoder_name> encoder_id_from_string(std::string_view s);
+	static std::optional<encoder::video_codec> codec_id_from_string(std::string_view s);
+	static const std::string & encoder_from_id(std::optional<encoder::encoder_name> id);
+	static const std::string & codec_from_id(std::optional<encoder::video_codec> id);
 };
+
+#undef SETTER_GETTER_NOTIFY

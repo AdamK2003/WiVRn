@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Dialogs as Dialogs
@@ -10,12 +12,62 @@ Kirigami.ScrollablePage {
     id: settings
     title: "Settings"
 
-    Settings2 {
+    flickable.interactive: false
+
+    Settings {
         id: config
     }
 
     Apps {
         id: apps
+    }
+    ListModel {
+        id: encoders
+        ListElement {
+            name: "auto"
+            label: "Auto"
+            codecs: "auto"
+        }
+        ListElement {
+            name: "nvenc"
+            label: "nvenc"
+            codecs: "auto,h264,h265"
+        }
+        ListElement {
+            name: "vaapi"
+            label: "vaapi"
+            codecs: "auto,h264,h265,av1"
+        }
+        ListElement {
+            name: "x264"
+            label: "x264"
+            codecs: "h264"
+        }
+        ListElement {
+            name: "vulkan"
+            label: "Vulkan"
+            codecs: "h264"
+        }
+    }
+
+    ListModel {
+        id: codecs
+        ListElement {
+            name: "auto"
+            label: "Auto"
+        }
+        ListElement {
+            name: "h264"
+            label: "H264"
+        }
+        ListElement {
+            name: "h265"
+            label: "H265"
+        }
+        ListElement {
+            name: "av1"
+            label: "AV1"
+        }
     }
 
     Dialogs.FileDialog {
@@ -152,8 +204,75 @@ Kirigami.ScrollablePage {
                 Layout.fillWidth: true
             }
 
-            // TODO partitioner
+            RectanglePartitionner {
+                id: partitionner
+                Kirigami.FormData.label: "Layout"
+                implicitWidth: 600
+                implicitHeight: 300
+                visible: manual_encoders.checked
+                settings: config
+                onCodecChanged: {
+                    for (var i = 0; i < codecs.count; i++) {
+                        if (codecs.get(i).name == codec)
+                            codec_combo.currentIndex = i;
+                    }
+                }
+                onEncoderChanged: {
+                    for (var i = 0; i < encoders.count; i++) {
+                        if (encoders.get(i).name == encoder)
+                            encoder_combo.currentIndex = i;
+                    }
+                }
+            }
 
+            Controls.ComboBox {
+                id: encoder_combo
+                Kirigami.FormData.label: "Encoder"
+                visible: manual_encoders.checked
+                model: encoders
+                enabled: partitionner.selected
+                textRole: "label"
+                onCurrentIndexChanged: {
+                    partitionner.encoder = encoders.get(currentIndex).name;
+
+                    // Check if the currently selected codec is supported by the new encoder
+                    var supported_codecs = encoders.get(currentIndex).codecs.split(",");
+                    var current_codec = codecs.get(codec_combo.currentIndex);
+
+                    if (!supported_codecs.includes(current_codec.name)) {
+                        for(var i = 0; i < codecs.count; i++) {
+                            if (supported_codecs.includes(codecs.get(i).name)) {
+                                codec_combo.currentIndex = i;
+                                break;
+                            }
+                        }
+                    }
+
+                    // TODO: update allowed codecs
+                }
+            }
+
+            Controls.ComboBox {
+                id: codec_combo
+                Kirigami.FormData.label: "Codec"
+                visible: manual_encoders.checked
+                model: codecs
+                enabled: partitionner.selected
+                textRole: "label"
+                onCurrentIndexChanged: partitionner.codec = codecs.get(currentIndex).name
+
+                delegate: Controls.ItemDelegate {
+                    required property int index
+                    required property string label
+                    required property string name
+
+                    width: codec_combo.width
+                    text: label
+                    font.weight: codec_combo.currentIndex === index ? Font.DemiBold : Font.Normal
+                    highlighted: ListView.isCurrentItem
+                    enabled: encoders.get(encoder_combo.currentIndex).codecs.split(",").includes(name)
+                }
+            }
         }
 
         Item {
@@ -186,6 +305,7 @@ Kirigami.ScrollablePage {
     function save() {
         config.bitrate = bitrate.value * 1000000;
         config.scale = manual_foveation.checked ? 1 - scale_slider.value / 100.0 : -1;
+        config.manualEncoders = manual_encoders.checked;
 
         if (apps.get(app_combobox.currentIndex).is_custom)
             config.application = app_text.text;
@@ -201,6 +321,12 @@ Kirigami.ScrollablePage {
             manual_foveation.checked = true;
         } else {
             auto_foveation.checked = true;
+        }
+
+        if (config.manualEncoders) {
+            manual_encoders.checked = true;
+        } else {
+            auto_encoders.checked = true;
         }
 
         var found = false;
