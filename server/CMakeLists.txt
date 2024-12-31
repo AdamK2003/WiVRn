@@ -41,7 +41,7 @@ set(XRT_HAVE_BLUETOOTH               OFF)
 set(XRT_HAVE_GST                     OFF)
 
 set(XRT_HAVE_JPEG                    OFF)
-set(XRT_HAVE_SDL2                    OFF)
+#set(XRT_HAVE_SDL2                    OFF)
 set(XRT_HAVE_OPENCV                  OFF)
 set(XRT_HAVE_DBUS                    OFF)
 set(XRT_HAVE_LIBUDEV                 OFF)
