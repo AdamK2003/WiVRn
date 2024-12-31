@@ -192,18 +192,18 @@ bool wivrn_hmd::wivrn_hmd_compute_distortion(xrt_device * xdev, uint32_t view_in
 
 xrt_result_t wivrn_hmd::get_visibility_mask(xrt_device * xdev, xrt_visibility_mask_type type, uint32_t view_index, xrt_visibility_mask ** mask)
 {
-	static_assert(sizeof(uint32_t) == sizeof(decltype(from_headset::visibility_mask::mask::indices)::value_type));
-	static_assert(sizeof(xrt_vec2) == sizeof(decltype(from_headset::visibility_mask::mask::vertices)::value_type));
+	static_assert(sizeof(uint32_t) == sizeof(decltype(from_headset::visibility_mask_changed::mask::indices)::value_type));
+	static_assert(sizeof(xrt_vec2) == sizeof(decltype(from_headset::visibility_mask_changed::mask::vertices)::value_type));
 	auto self = (wivrn_hmd *)xdev;
 	type = xrt_visibility_mask_type((unsigned int)type - 1); // enum values start at 1
-	const auto & info = self->cnx->get_info();
+	const auto visibility_mask = self->visibility_mask.lock();
 	if (
-	        type >= from_headset::visibility_mask::num_types or view_index >= from_headset::visibility_mask::num_views or not info.mask)
+	        type >= from_headset::visibility_mask_changed::num_types or view_index >= 2 or not *visibility_mask)
 	{
 		*mask = (xrt_visibility_mask *)calloc(1, sizeof(xrt_visibility_mask));
 		return XRT_SUCCESS;
 	}
-	const auto & in_mask = info.mask->masks[int(type)][view_index];
+	const auto & in_mask = (**visibility_mask)[int(type)][view_index];
 	size_t index_size = in_mask.indices.size() * sizeof(uint32_t);
 	size_t vertex_size = in_mask.vertices.size() * sizeof(xrt_vec2);
 	*mask = (xrt_visibility_mask *)calloc(1, sizeof(xrt_visibility_mask) + index_size + vertex_size);
@@ -281,6 +281,8 @@ wivrn_hmd::wivrn_hmd(wivrn::wivrn_session * cnx,
 	// FOV from headset info packet
 	hmd->distortion.fov[0] = xrt_cast(info.fov[0]);
 	hmd->distortion.fov[1] = xrt_cast(info.fov[1]);
+
+	*visibility_mask.lock() = info.mask;
 }
 
 void wivrn_hmd::update_inputs()
@@ -435,6 +437,14 @@ void wivrn_hmd::set_foveation_center(std::array<xrt_vec2, 2> center)
 			        solve_foveation(foveation_parameters[i].y.scale, foveation_parameters[i].y.center);
 		}
 	}
+}
+
+void wivrn_hmd::update_visibility_mask(const from_headset::visibility_mask_changed & mask)
+{
+	auto m = visibility_mask.lock();
+	if (not *m)
+		m->emplace();
+	(*m)->at(mask.view_index) = mask.data;
 }
 
 /*

@@ -74,36 +74,43 @@ static const std::array supported_formats = {
         vk::Format::eB8G8R8A8Srgb,
 };
 
-static std::optional<from_headset::visibility_mask> get_visibility_mask(xr::instance & inst, xr::session & session)
+static from_headset::visibility_mask_changed::masks get_visibility_mask(xr::instance & inst, xr::session & session, int view)
+{
+	assert(inst.has_extension(XR_KHR_VISIBILITY_MASK_EXTENSION_NAME));
+	static auto xrGetVisibilityMaskKHR = inst.get_proc<PFN_xrGetVisibilityMaskKHR>("xrGetVisibilityMaskKHR");
+
+	from_headset::visibility_mask_changed::masks res{};
+	for (auto [type, mask]: utils::enumerate(res))
+	{
+		XrVisibilityMaskKHR xr_mask{
+		        .type = XR_TYPE_VISIBILITY_MASK_KHR,
+		};
+		CHECK_XR(xrGetVisibilityMaskKHR(session, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view, XrVisibilityMaskTypeKHR(type + 1), &xr_mask));
+		mask.vertices.resize(xr_mask.vertexCountOutput);
+		mask.indices.resize(xr_mask.indexCountOutput);
+		xr_mask = {
+		        .type = XR_TYPE_VISIBILITY_MASK_KHR,
+		        .vertexCapacityInput = uint32_t(mask.vertices.size()),
+		        .vertices = mask.vertices.data(),
+		        .indexCapacityInput = uint32_t(mask.indices.size()),
+		        .indices = mask.indices.data(),
+		};
+		CHECK_XR(xrGetVisibilityMaskKHR(session, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view, XrVisibilityMaskTypeKHR(type + 1), &xr_mask));
+		mask.vertices.resize(xr_mask.vertexCountOutput);
+		mask.indices.resize(xr_mask.indexCountOutput);
+	}
+	return res;
+}
+
+static decltype(from_headset::headset_info_packet::mask) get_visibility_masks(xr::instance & inst, xr::session & session)
 {
 	if (not inst.has_extension(XR_KHR_VISIBILITY_MASK_EXTENSION_NAME))
 		return {};
 
-	static auto xrGetVisibilityMaskKHR = inst.get_proc<PFN_xrGetVisibilityMaskKHR>("xrGetVisibilityMaskKHR");
-	from_headset::visibility_mask res{};
+	decltype(from_headset::headset_info_packet::mask)::value_type res{};
 
-	for (auto [type, masks]: utils::enumerate(res.masks))
-	{
-		for (auto [view, mask]: utils::enumerate(masks))
-		{
-			XrVisibilityMaskKHR xr_mask{
-			        .type = XR_TYPE_VISIBILITY_MASK_KHR,
-			};
-			CHECK_XR(xrGetVisibilityMaskKHR(session, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view, XrVisibilityMaskTypeKHR(type + 1), &xr_mask));
-			mask.vertices.resize(xr_mask.vertexCountOutput);
-			mask.indices.resize(xr_mask.indexCountOutput);
-			xr_mask = {
-			        .type = XR_TYPE_VISIBILITY_MASK_KHR,
-			        .vertexCapacityInput = uint32_t(mask.vertices.size()),
-			        .vertices = mask.vertices.data(),
-			        .indexCapacityInput = uint32_t(mask.indices.size()),
-			        .indices = mask.indices.data(),
-			};
-			CHECK_XR(xrGetVisibilityMaskKHR(session, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, view, XrVisibilityMaskTypeKHR(type + 1), &xr_mask));
-			mask.vertices.resize(xr_mask.vertexCountOutput);
-			mask.indices.resize(xr_mask.indexCountOutput);
-		}
-	}
+	for (auto [view, masks]: utils::enumerate(res))
+		masks = get_visibility_mask(inst, session, view);
 	return res;
 }
 
@@ -163,7 +170,7 @@ std::shared_ptr<scenes::stream> scenes::stream::create(std::unique_ptr<wivrn_ses
 		info.face_tracking2_fb = config.check_feature(feature::face_tracking);
 		info.palm_pose = application::space(xr::spaces::palm_left) or application::space(xr::spaces::palm_right);
 		info.passthrough = self->system.passthrough_supported() != xr::system::passthrough_type::no_passthrough;
-		info.mask = get_visibility_mask(self->instance, self->session);
+		info.mask = get_visibility_masks(self->instance, self->session);
 
 		audio::get_audio_description(info);
 		if (not(config.check_feature(feature::microphone)))

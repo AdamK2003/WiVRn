@@ -116,16 +116,18 @@ struct pin_check_3
 	crypto::smp::msg3 message;
 };
 
-struct visibility_mask
+struct visibility_mask_changed
 {
-	static const int num_types = 3; // XrVisibilityMaskTypeKHR values
-	static const int num_views = 2;
 	struct mask
 	{
 		std::vector<XrVector2f> vertices;
 		std::vector<uint32_t> indices;
 	};
-	std::array<std::array<mask, num_views>, num_types> masks;
+	static const int num_types = 3; // XrVisibilityMaskTypeKHR values
+	using masks = std::array<mask, num_types>;
+
+	masks data;
+	uint8_t view_index;
 };
 
 struct headset_info_packet
@@ -147,7 +149,7 @@ struct headset_info_packet
 	bool face_tracking2_fb;
 	bool palm_pose;
 	bool passthrough;
-	std::optional<visibility_mask> mask;
+	std::optional<std::array<visibility_mask_changed::masks, 2>> mask;
 	std::vector<video_codec> supported_codecs; // from preferred to least preferred
 };
 
@@ -286,7 +288,7 @@ struct battery
 	bool charging;
 };
 
-using packets = std::variant<crypto_handshake, pin_check_1, pin_check_3, headset_info_packet, feedback, audio_data, handshake, tracking, trackings, hand_tracking, inputs, timesync_response, battery>;
+using packets = std::variant<crypto_handshake, pin_check_1, pin_check_3, headset_info_packet, feedback, audio_data, handshake, tracking, trackings, hand_tracking, inputs, timesync_response, battery, visibility_mask_changed>;
 } // namespace from_headset
 
 namespace to_headset
